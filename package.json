@@ -1,0 +1,12 @@
+{
+    "name": "shogi.js",
+    "version": "0.1.0",
+    "description": "JavaScript shogi logic library",
+    "type": "module",
+    "main": "src/main.js",
+    "keywords": [
+        "shogi-logic",
+        "shogi.js"
+    ],
+    "license": "MIT"
+}

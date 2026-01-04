@@ -1,5 +1,5 @@
 {
-    "name": "shogi.js",
+    "name": "shogi",
     "version": "0.1.0",
     "description": "JavaScript shogi logic library",
     "type": "module",
@@ -8,5 +8,17 @@
         "shogi-logic",
         "shogi.js"
     ],
-    "license": "MIT"
+    "license": "MIT",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/NukoNeko693/shogi.js.git"
+    },
+    "author": "",
+    "bugs": {
+        "url": "https://github.com/NukoNeko693/shogi.js/issues"
+    },
+    "homepage": "https://github.com/NukoNeko693/shogi.js#readme"
 }

@@ -1,4 +1,4 @@
-import { BitBoard } from '../Board.js';
+import { BitBoard } from '../Shogi.js';
 
 export function runAllTests() {
     console.log("=== BitBoard Test Start ===");

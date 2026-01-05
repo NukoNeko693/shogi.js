@@ -184,22 +184,6 @@ export class BitBoard {
         return attacks;
     }
 
-    isSquareAttacked(index, byColor) {
-        const keys = byColor === "black"
-            ? ["P", "L", "N", "S", "G", "B", "R", "K", "+P", "+L", "+N", "+S", "+B", "+R"]
-            : ["p", "l", "n", "s", "g", "b", "r", "k", "+p", "+l", "+n", "+s", "+b", "+r"];
-        for (const piece of keys) {
-            const bb = BigInt(this.pieces[piece] || 0n);
-            for (let i = 0; i < 81; i++) {
-                if ((bb >> BigInt(i)) & 1n) {
-                    const attacks = this.attacksFrom(piece, i);
-                    if (attacks.includes(index)) return true;
-                }
-            }
-        }
-        return false;
-    }
-
     isCheck(color) {
         const enemy = color === "black" ? "white" : "black";
         const kingPiece = color === "black" ? "K" : "k";
@@ -422,20 +406,29 @@ export class BitBoard {
     }
 
 
+
     isDropMate(move) {
-        if (move.piece.toUpperCase() !== "P") return false;
-        const enemy = this.turn === "black" ? "white" : "black";
-        const kingEntry = Object.entries(this.pieces).find(([p, _]) => (enemy === "black" ? p === "K" : p === "k"));
-        if (!kingEntry) return false;
-        const [_, bb] = kingEntry;
-        let kingIndex = -1;
-        const bbBig = BigInt(bb || 0n);
-        for (let i = 0; i < 81; i++) if ((bbBig >> BigInt(i)) & 1n) { kingIndex = i; break; }
-        if (kingIndex === -1) return false;
-        const moves = this.attacksFrom(enemy === "black" ? "K" : "k", kingIndex);
-        for (const idx of moves) if (this.getPieceAt(idx) === '.') return false;
-        return true;
+        // 歩打ち以外は対象外
+        if (!move.drop || move.piece.toUpperCase() !== "P") return false;
+
+        // applyMove 後に呼ばれている前提
+        const attacker = this.turn === "black" ? "white" : "black"; // 打った側
+        const defender = this.turn; // 受ける側
+
+        // 1. そもそも王手でなければ打ち歩詰めではない
+        if (!this.isCheck(defender)) return false;
+
+        // 2. 相手に1手でも合法手があれば詰みではない
+        const savedTurn = this.turn;
+        this.turn = defender;
+
+        const replies = this.generateLegalMoves();
+
+        this.turn = savedTurn;
+
+        return replies.length === 0;
     }
+
 
     applyMove(move) {
         const { from, to, piece, promote, drop } = move;

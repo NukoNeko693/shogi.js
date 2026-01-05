@@ -1,4 +1,4 @@
-import { BitBoard } from './src/Board.js';
+import { BitBoard } from '../Board.js';
 
 function testBitBoard() {
     console.log("=== BitBoard 全関数テスト ===");

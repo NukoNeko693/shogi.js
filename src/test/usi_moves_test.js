@@ -1,4 +1,4 @@
-import { BitBoard } from './src/Board.js';
+import { BitBoard } from '../Board.js';
 
 function testUSIMoves() {
     const board = new BitBoard();

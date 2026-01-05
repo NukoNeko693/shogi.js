@@ -1,16 +1,17 @@
-import { BitBoard } from '../Board.js';
+import { BitBoard } from './src/Board.js';
 
-function testRandomMovesUndo() {
+function testRandomMovesUndo(time) {
     const board = new BitBoard();
     const originalState = board.toString(); // 初期局面の文字列を保持
 
     const moveHistory = [];
 
     // 100回ランダム合法手を選んで実行
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < time; i++) {
         const moves = board.generateLegalMoves();
         if (moves.length === 0) {
             console.log(`途中で合法手がなくなった: ${i}手目`);
+            console.log(board.toString());
             break;
         }
         // ランダムに選ぶ
@@ -18,6 +19,8 @@ function testRandomMovesUndo() {
         board.applyMove(move);
         moveHistory.push(move);
     }
+
+    console.log(board.toString());
 
     // 100回undoMoveで元に戻す
     for (let i = 0; i < moveHistory.length; i++) {
@@ -28,6 +31,7 @@ function testRandomMovesUndo() {
 
     if (originalState === finalState) {
         console.log("テスト成功 ✅ 元の局面に戻りました。");
+        console.log(board.toString());
     } else {
         console.log("テスト失敗 ❌ 元の局面に戻りませんでした。");
         console.log("初期局面:\n", originalState);
@@ -35,5 +39,6 @@ function testRandomMovesUndo() {
     }
 }
 
+const time = 1000;
 // 実行
-testRandomMovesUndo();
+testRandomMovesUndo(time);

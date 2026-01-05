@@ -9,16 +9,9 @@
         "shogi.js"
     ],
     "license": "MIT",
-    "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1"
-    },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/NukoNeko693/shogi.js.git"
     },
-    "author": "",
-    "bugs": {
-        "url": "https://github.com/NukoNeko693/shogi.js/issues"
-    },
-    "homepage": "https://github.com/NukoNeko693/shogi.js#readme"
+    "author": "NukoNeko693"
 }

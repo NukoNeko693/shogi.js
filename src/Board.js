@@ -15,25 +15,33 @@ export class BitBoard {
     }
 
     init() {
-        const sfen = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL";
+        const sfen = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1";
         this.fromSFEN(sfen);
-        this.hand.black = {};
-        this.hand.white = {};
-        this.turn = "black";
         this.history = [];
     }
 
+
     clone() {
-        const copy = new BitBoard();
+        const copy = Object.create(BitBoard.prototype);
+        copy.pieces = {};
         for (const k in this.pieces) copy.pieces[k] = this.pieces[k];
-        copy.hand.black = { ...this.hand.black };
-        copy.hand.white = { ...this.hand.white };
+        copy.hand = {
+            black: { ...this.hand.black },
+            white: { ...this.hand.white }
+        };
         copy.turn = this.turn;
         copy.history = [];
         return copy;
     }
 
-    fromSFEN(boardSfen) {
+
+    fromSFEN(sfen) {
+        const parts = sfen.split(' ');
+        const boardSfen = parts[0];
+        const turnSfen = parts[1];
+        const handSfen = parts[2] || "-";
+
+        // 盤上駒セット
         for (const k in this.pieces) this.pieces[k] = 0n;
         let rank = 0, file = 0;
         for (let i = 0; i < boardSfen.length; i++) {
@@ -46,7 +54,25 @@ export class BitBoard {
             this.setPiece(piece, index);
             file++;
         }
+
+        // 手番セット
+        this.turn = turnSfen === "b" ? "black" : "white";
+
+        // 持ち駒セット
+        this.hand.black = {};
+        this.hand.white = {};
+        if (handSfen !== "-") {
+            let count = "";
+            for (const c of handSfen) {
+                if (c >= "1" && c <= "9") { count += c; continue; }
+                const n = count === "" ? 1 : parseInt(count);
+                if (c.toUpperCase() === c) this.hand.black[c] = n;
+                else this.hand.white[c.toUpperCase()] = n;
+                count = "";
+            }
+        }
     }
+
 
     setPiece(piece, index) {
         if (!(piece in this.pieces)) throw new Error(`Unknown piece: ${piece}`);
@@ -175,15 +201,114 @@ export class BitBoard {
     }
 
     isCheck(color) {
-        const kingEntry = Object.entries(this.pieces).find(([p, _]) => (color === "black" ? p === "K" : p === "k"));
-        if (!kingEntry) return false;
-        const [_, bb] = kingEntry;
-        let kingIndex = -1;
-        const bbBig = BigInt(bb || 0n);
-        for (let i = 0; i < 81; i++) if ((bbBig >> BigInt(i)) & 1n) { kingIndex = i; break; }
-        if (kingIndex === -1) return false;
-        return this.isSquareAttacked(kingIndex, color === "black" ? "white" : "black");
+        const enemy = color === "black" ? "white" : "black";
+        const kingPiece = color === "black" ? "K" : "k";
+
+        // 玉の位置
+        let kingSq = -1;
+        const kingBB = this.pieces[kingPiece];
+        if (!kingBB) return false;
+
+        for (let i = 0; i < 81; i++) {
+            if ((kingBB >> BigInt(i)) & 1n) {
+                kingSq = i;
+                break;
+            }
+        }
+        if (kingSq === -1) return false;
+
+        const kr = Math.floor(kingSq / 9);
+        const kf = kingSq % 9;
+        const isBlack = color === "black";
+
+        const inBoard = (r, f) => r >= 0 && r < 9 && f >= 0 && f < 9;
+        const idx = (r, f) => r * 9 + f;
+
+        const enemyAt = (r, f, pieces) => {
+            if (!inBoard(r, f)) return false;
+            const p = this.getPieceAt(idx(r, f));
+            return pieces.includes(p);
+        };
+
+        /* ---------- 歩 ---------- */
+        if (enemyAt(
+            kr + (isBlack ? -1 : 1),
+            kf,
+            enemy === "black" ? ["P"] : ["p"]
+        )) return true;
+
+        /* ---------- 桂 ---------- */
+        const knightTargets = isBlack
+            ? [[kr - 2, kf - 1], [kr - 2, kf + 1]]
+            : [[kr + 2, kf - 1], [kr + 2, kf + 1]];
+
+        for (const [r, f] of knightTargets)
+            if (enemyAt(r, f, enemy === "black" ? ["N"] : ["n"])) return true;
+
+        /* ---------- 金・成駒 ---------- */
+        const goldMoves = isBlack
+            ? [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, 0]]
+            : [[1, -1], [1, 0], [1, 1], [0, -1], [0, 1], [-1, 0]];
+
+        for (const [dr, df] of goldMoves)
+            if (enemyAt(
+                kr + dr,
+                kf + df,
+                enemy === "black"
+                    ? ["G", "+P", "+L", "+N", "+S"]
+                    : ["g", "+p", "+l", "+n", "+s"]
+            )) return true;
+
+        /* ---------- 銀 ---------- */
+        const silverMoves = isBlack
+            ? [[-1, -1], [-1, 0], [-1, 1], [1, -1], [1, 1]]
+            : [[1, -1], [1, 0], [1, 1], [-1, -1], [-1, 1]];
+
+        for (const [dr, df] of silverMoves)
+            if (enemyAt(
+                kr + dr,
+                kf + df,
+                enemy === "black" ? ["S"] : ["s"]
+            )) return true;
+
+        /* ---------- 玉 ---------- */
+        for (let dr = -1; dr <= 1; dr++)
+            for (let df = -1; df <= 1; df++)
+                if (dr || df)
+                    if (enemyAt(
+                        kr + dr,
+                        kf + df,
+                        enemy === "black" ? ["K"] : ["k"]
+                    )) return true;
+
+        /* ---------- 飛・角・香（スライド） ---------- */
+        const slide = (dr, df, targets) => {
+            let r = kr + dr, f = kf + df;
+            while (inBoard(r, f)) {
+                const p = this.getPieceAt(idx(r, f));
+                if (p !== '.') return targets.includes(p);
+                r += dr; f += df;
+            }
+            return false;
+        };
+
+        if (
+            slide(-1, 0, enemy === "black" ? ["R", "+R", "L"] : ["r", "+r", "l"]) ||
+            slide(1, 0, enemy === "black" ? ["R", "+R"] : ["r", "+r"]) ||
+            slide(0, -1, enemy === "black" ? ["R", "+R"] : ["r", "+r"]) ||
+            slide(0, 1, enemy === "black" ? ["R", "+R"] : ["r", "+r"])
+        ) return true;
+
+        if (
+            slide(-1, -1, enemy === "black" ? ["B", "+B"] : ["b", "+b"]) ||
+            slide(-1, 1, enemy === "black" ? ["B", "+B"] : ["b", "+b"]) ||
+            slide(1, -1, enemy === "black" ? ["B", "+B"] : ["b", "+b"]) ||
+            slide(1, 1, enemy === "black" ? ["B", "+B"] : ["b", "+b"])
+        ) return true;
+
+        return false;
     }
+
 
 
     // ------------------------
@@ -315,48 +440,71 @@ export class BitBoard {
     applyMove(move) {
         const { from, to, piece, promote, drop } = move;
         const diff = { ...move, captured: null };
+
         if (drop) {
             this.removeHandPiece(this.turn, piece);
             const bp = this.turn === "black" ? piece : piece.toLowerCase();
             this.setPiece(bp, to);
             diff.placedPiece = bp;
             this.history.push(diff);
-            this.switchTurn(); return;
+            this.switchTurn();
+            return;
         }
+
         const boardPiece = this.getPieceAt(from);
         if (boardPiece === '.') throw new Error(`移動元に駒がない: ${from}`);
+
         const captured = this.getPieceAt(to);
         if (captured !== '.') {
             diff.captured = captured;
             const base = captured.startsWith("+") ? captured[1] : captured;
-            this.addHandPiece(this.turn, this.turn === "black" ? base : base.toUpperCase());
+            this.addHandPiece(
+                this.turn,
+                this.turn === "black" ? base.toUpperCase() : base.toUpperCase()
+            );
             this.removePiece(captured, to);
         }
+
         this.removePiece(boardPiece, from);
+
         let placedPiece = boardPiece;
-        if (promote && !boardPiece.startsWith("+")) placedPiece = "+" + boardPiece.toUpperCase();
+        if (promote && !boardPiece.startsWith("+")) {
+            placedPiece = boardPiece === boardPiece.toUpperCase()
+                ? "+" + boardPiece
+                : "+" + boardPiece.toLowerCase();
+        }
+
         this.setPiece(placedPiece, to);
         diff.placedPiece = placedPiece;
         this.history.push(diff);
         this.switchTurn();
     }
 
+
     undoMove() {
         if (this.history.length === 0) return;
         const diff = this.history.pop();
         this.switchTurn();
+
         if (diff.drop) {
             this.removePiece(diff.placedPiece, diff.to);
-            this.addHandPiece(this.turn, diff.piece); return;
+            this.addHandPiece(this.turn, diff.piece);
+            return;
         }
+
         this.setPiece(diff.piece, diff.from);
         this.removePiece(diff.placedPiece, diff.to);
+
         if (diff.captured) {
             this.setPiece(diff.captured, diff.to);
             const base = diff.captured.startsWith("+") ? diff.captured[1] : diff.captured;
-            this.removeHandPiece(this.turn, this.turn === "black" ? base : base.toUpperCase());
+            this.removeHandPiece(
+                this.turn,
+                base.toUpperCase()
+            );
         }
     }
+
 
     switchTurn() { this.turn = this.turn === "black" ? "white" : "black"; }
 

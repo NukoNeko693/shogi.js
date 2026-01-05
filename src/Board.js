@@ -4,7 +4,9 @@ export class BitBoard {
     constructor() {
         this.pieces = {
             P: 0n, L: 0n, N: 0n, S: 0n, G: 0n, B: 0n, R: 0n, K: 0n,
+            '+P': 0n, '+L': 0n, '+N': 0n, '+S': 0n, '+B': 0n, '+R': 0n,
             p: 0n, l: 0n, n: 0n, s: 0n, g: 0n, b: 0n, r: 0n, k: 0n,
+            '+p': 0n, '+l': 0n, '+n': 0n, '+s': 0n, '+b': 0n, '+r': 0n
         };
         this.hand = { black: {}, white: {} };
         this.turn = "black";
@@ -58,8 +60,7 @@ export class BitBoard {
 
     getPieceAt(index) {
         for (const [piece, bb] of Object.entries(this.pieces)) {
-            const bbBig = BigInt(bb || 0n);
-            if ((bbBig >> BigInt(index)) & 1n) return piece;
+            if ((BigInt(bb || 0n) >> BigInt(index)) & 1n) return piece;
         }
         return '.';
     }
@@ -77,12 +78,6 @@ export class BitBoard {
             : ["p", "l", "n", "s", "g", "b", "r", "k", "+p", "+l", "+n", "+s", "+b", "+r"];
         for (const k of keys) { const bb = this.pieces[k]; if (!bb) continue; occ |= BigInt(bb); }
         return occ;
-    }
-
-    findPieceIndex(piece) {
-        const bb = BigInt(this.pieces[piece] || 0n);
-        for (let i = 0; i < 81; i++) if ((bb >> BigInt(i)) & 1n) return i;
-        return -1;
     }
 
     addHandPiece(color, piece, count = 1) {
@@ -103,9 +98,6 @@ export class BitBoard {
         this.setPiece(boardPiece, index);
     }
 
-    // =====================
-    // 利き・判定
-    // =====================
     attacksFrom(piece, index) {
         const attacks = [];
         const rank = Math.floor(index / 9);
@@ -118,7 +110,6 @@ export class BitBoard {
         const inBoard = (r, f) => r >= 0 && r < 9 && f >= 0 && f < 9;
         const idxOf = (r, f) => r * 9 + f;
 
-        // スライダー系（飛車・角・香）
         const slide = (dr, df) => {
             let r = rank + dr, f = file + df;
             while (inBoard(r, f)) {
@@ -131,7 +122,6 @@ export class BitBoard {
             }
         };
 
-        // 1マス移動系
         const addIfValid = (dr, df) => {
             const r = rank + dr, f = file + df;
             if (!inBoard(r, f)) return;
@@ -140,36 +130,17 @@ export class BitBoard {
         };
 
         switch (piece.toUpperCase()) {
-            case "P":
-                addIfValid(isBlack ? -1 : 1, 0); // 黒は上方向(-1)、白は下方向(+1)
-                break;
-            case "L":
-                slide(isBlack ? -1 : 1, 0); // 香
-                break;
-            case "N":
-                addIfValid(isBlack ? -2 : 2, -1);
-                addIfValid(isBlack ? -2 : 2, 1);
-                break;
+            case "P": addIfValid(isBlack ? -1 : 1, 0); break;
+            case "L": slide(isBlack ? -1 : 1, 0); break;
+            case "N": addIfValid(isBlack ? -2 : 2, -1); addIfValid(isBlack ? -2 : 2, 1); break;
             case "S":
-                addIfValid(isBlack ? -1 : 1, -1);
-                addIfValid(isBlack ? -1 : 1, 0);
-                addIfValid(isBlack ? -1 : 1, 1);
-                addIfValid(isBlack ? 1 : -1, -1);
-                addIfValid(isBlack ? 1 : -1, 1);
+                addIfValid(isBlack ? -1 : 1, -1); addIfValid(isBlack ? -1 : 1, 0); addIfValid(isBlack ? -1 : 1, 1);
+                addIfValid(isBlack ? 1 : -1, -1); addIfValid(isBlack ? 1 : -1, 1);
                 break;
             case "G":
             case "+P": case "+L": case "+N": case "+S":
-                addIfValid(isBlack ? -1 : 1, -1);
-                addIfValid(isBlack ? -1 : 1, 0);
-                addIfValid(isBlack ? -1 : 1, 1);
-                addIfValid(0, -1);
-                addIfValid(0, 1);
-                addIfValid(isBlack ? 1 : -1, 0);
-                break;
-            case "K":
-                for (let dr = -1; dr <= 1; dr++)
-                    for (let df = -1; df <= 1; df++)
-                        if (dr !== 0 || df !== 0) addIfValid(dr, df);
+                addIfValid(isBlack ? -1 : 1, -1); addIfValid(isBlack ? -1 : 1, 0); addIfValid(isBlack ? -1 : 1, 1);
+                addIfValid(0, -1); addIfValid(0, 1); addIfValid(isBlack ? 1 : -1, 0);
                 break;
             case "B":
                 slide(-1, -1); slide(-1, 1); slide(1, -1); slide(1, 1);
@@ -178,6 +149,9 @@ export class BitBoard {
             case "R":
                 slide(-1, 0); slide(1, 0); slide(0, -1); slide(0, 1);
                 if (piece.startsWith("+")) { addIfValid(-1, -1); addIfValid(-1, 1); addIfValid(1, -1); addIfValid(1, 1); }
+                break;
+            case "K":
+                for (let dr = -1; dr <= 1; dr++) for (let df = -1; df <= 1; df++) if (dr !== 0 || df !== 0) addIfValid(dr, df);
                 break;
         }
 

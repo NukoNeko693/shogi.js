@@ -106,6 +106,47 @@ export class BitBoard {
         return occ;
     }
 
+    canPromote(from, to) {
+        const piece = this.getPieceAt(from).toUpperCase();
+        if (piece === "P" || piece === "L" || piece === "N" || piece === "S" || piece === "B" || piece === "R") {
+            const fromRank = Math.floor(from / 9);
+            const toRank = Math.floor(to / 9);
+            if (this.turn === "black") {
+                return fromRank <= 2 || toRank <= 2;
+            } else {
+                return fromRank >= 6 || toRank >= 6;
+            }
+        }
+        return false;
+    }
+
+    mustPromote(from, to) {
+        // 後々実装
+    }
+
+    movePiece(from, to, dropPiece = null, promote = false) {
+        if (dropPiece) {
+            // 持ち駒打ち
+            const boardPiece = this.turn === "black" ? dropPiece : dropPiece.toLowerCase();
+            this.setPiece(boardPiece, to); // 修正
+            this.hand[this.turn][dropPiece]--;
+        } else {
+            let piece = this.getPieceAt(from);
+
+            // 成る場合は + を付与
+            if (promote && !piece.startsWith("+") && piece.toUpperCase() !== "K" && piece.toUpperCase() !== "G") {
+                piece = piece.startsWith("+") ? piece : (piece.toUpperCase() === piece ? "+" + piece : "+" + piece.toLowerCase());
+            }
+
+            this.setPiece(piece, to);             // 修正
+            this.removePiece(this.getPieceAt(from), from); // 修正
+        }
+
+        // 手番切替
+        this.turn = this.turn === "black" ? "white" : "black";
+    }
+
+
     addHandPiece(color, piece, count = 1) {
         if (!this.hand[color][piece]) this.hand[color][piece] = 0;
         this.hand[color][piece] += count;
@@ -176,6 +217,17 @@ export class BitBoard {
                 slide(-1, 0); slide(1, 0); slide(0, -1); slide(0, 1);
                 if (piece.startsWith("+")) { addIfValid(-1, -1); addIfValid(-1, 1); addIfValid(1, -1); addIfValid(1, 1); }
                 break;
+            case "+B":
+                // 馬：斜めスライド + 1マス縦横
+                slide(-1, -1); slide(-1, 1); slide(1, -1); slide(1, 1);
+                addIfValid(-1, 0); addIfValid(1, 0); addIfValid(0, -1); addIfValid(0, 1);
+                break;
+            case "+R":
+                // 龍：縦横スライド + 1マス斜め
+                slide(-1, 0); slide(1, 0); slide(0, -1); slide(0, 1);
+                addIfValid(-1, -1); addIfValid(-1, 1); addIfValid(1, -1); addIfValid(1, 1);
+                break;
+
             case "K":
                 for (let dr = -1; dr <= 1; dr++) for (let df = -1; df <= 1; df++) if (dr !== 0 || df !== 0) addIfValid(dr, df);
                 break;
@@ -265,7 +317,7 @@ export class BitBoard {
                         enemy === "black" ? ["K"] : ["k"]
                     )) return true;
 
-        /* ---------- 飛・角・香（スライド） ---------- */
+        /* ---------- 飛車・角・香（スライド） ---------- */
         const slide = (dr, df, targets) => {
             let r = kr + dr, f = kf + df;
             while (inBoard(r, f)) {
@@ -276,6 +328,7 @@ export class BitBoard {
             return false;
         };
 
+        // 飛車スライド判定
         if (
             slide(-1, 0, enemy === "black" ? ["R", "+R", "L"] : ["r", "+r", "l"]) ||
             slide(1, 0, enemy === "black" ? ["R", "+R"] : ["r", "+r"]) ||
@@ -283,6 +336,7 @@ export class BitBoard {
             slide(0, 1, enemy === "black" ? ["R", "+R"] : ["r", "+r"])
         ) return true;
 
+        // 角スライド判定
         if (
             slide(-1, -1, enemy === "black" ? ["B", "+B"] : ["b", "+b"]) ||
             slide(-1, 1, enemy === "black" ? ["B", "+B"] : ["b", "+b"]) ||
@@ -290,9 +344,19 @@ export class BitBoard {
             slide(1, 1, enemy === "black" ? ["B", "+B"] : ["b", "+b"])
         ) return true;
 
+        /* ---------- 馬・龍の追加1マス利き判定 ---------- */
+        // 馬：縦横1マス
+        const horseOffsets = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+        for (const [dr, df] of horseOffsets)
+            if (enemyAt(kr + dr, kf + df, enemy === "black" ? ["+B"] : ["+b"])) return true;
+
+        // 龍：斜め1マス
+        const dragonOffsets = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+        for (const [dr, df] of dragonOffsets)
+            if (enemyAt(kr + dr, kf + df, enemy === "black" ? ["+R"] : ["+r"])) return true;
+
         return false;
     }
-
 
 
     // ------------------------
@@ -405,6 +469,30 @@ export class BitBoard {
         return this.generateLegalMoves().map(m => this.moveToUSI(m));
     }
 
+
+    // ------------------------
+    // 特定の駒が進める先 index 一覧
+    // ------------------------
+    getMovableSquares(fromIndex) {
+        const piece = this.getPieceAt(fromIndex);
+        if (piece === '.') return [];
+
+        const color = piece === piece.toUpperCase() ? "black" : "white";
+        if (color !== this.turn) return [];
+
+        const moves = this.generateLegalMoves();
+
+        const targets = new Set();
+
+        for (const move of moves) {
+            if (move.drop) continue;
+            if (move.from === fromIndex) {
+                targets.add(move.to);
+            }
+        }
+
+        return [...targets];
+    }
 
 
     isDropMate(move) {

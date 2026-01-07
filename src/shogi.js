@@ -18,6 +18,7 @@ export class BitBoard {
         const sfen = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1";
         this.fromSFEN(sfen);
         this.history = [];
+        this.moveNumber = 1;
     }
 
 
@@ -40,6 +41,7 @@ export class BitBoard {
         const boardSfen = parts[0];
         const turnSfen = parts[1];
         const handSfen = parts[2] || "-";
+        const moveNumberSfen = parts[3];
 
         // 盤上駒セット
         for (const k in this.pieces) this.pieces[k] = 0n;
@@ -71,6 +73,9 @@ export class BitBoard {
                 count = "";
             }
         }
+
+        // --- 手番番号セット ---
+        this.moveNumber = moveNumberSfen ? parseInt(moveNumberSfen) : 1;
     }
 
 
@@ -559,6 +564,7 @@ export class BitBoard {
         diff.placedPiece = placedPiece;
         this.history.push(diff);
         this.switchTurn();
+        this.moveNumber++;
     }
 
 
@@ -584,10 +590,63 @@ export class BitBoard {
                 base.toUpperCase()
             );
         }
+
+        this.moveNumber--;
     }
 
 
     switchTurn() { this.turn = this.turn === "black" ? "white" : "black"; }
+
+
+    toSFEN() {
+        // --- 盤上駒 ---
+        let sfenBoard = "";
+        for (let rank = 0; rank < 9; rank++) {
+            let empty = 0;
+            for (let file = 0; file < 9; file++) {
+                const idx = rank * 9 + file;
+                const piece = this.getPieceAt(idx);
+                if (piece === '.') {
+                    empty++;
+                } else {
+                    if (empty > 0) { sfenBoard += empty; empty = 0; }
+                    sfenBoard += piece;
+                }
+            }
+            if (empty > 0) sfenBoard += empty;
+            if (rank !== 8) sfenBoard += "/";
+        }
+
+        // --- 手番 ---
+        const turnChar = this.turn === "black" ? "b" : "w";
+
+        // --- 持ち駒 ---
+        const handPieces = ["P", "L", "N", "S", "G", "B", "R"];
+        let handStr = "";
+        const counts = {};
+
+        for (const color of ["black", "white"]) {
+            for (const piece of handPieces) {
+                const n = this.hand[color][piece] || 0;
+                if (n <= 0) continue;
+                const c = color === "black" ? piece : piece.toLowerCase();
+                counts[c] = (counts[c] || 0) + n;
+            }
+        }
+
+        // SFENは順番 P L N S G B R 先手後手をまとめて
+        const order = ["P", "L", "N", "S", "G", "B", "R", "p", "l", "n", "s", "g", "b", "r"];
+        for (const k of order) {
+            if (counts[k]) handStr += (counts[k] > 1 ? counts[k] : "") + k;
+        }
+        if (handStr === "") handStr = "-";
+
+        // --- 手順番号（今回は1固定） ---
+        const moveNumber = this.moveNumber;
+
+        return `${sfenBoard} ${turnChar} ${handStr} ${moveNumber}`;
+    }
+
 
     toString() {
         let str = "";

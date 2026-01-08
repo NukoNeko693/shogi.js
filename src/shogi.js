@@ -364,6 +364,19 @@ export class BitBoard {
     }
 
 
+    isCheckMate() {
+        const moves = this.generateLegalMoves();
+        return moves.length === 0;
+    }
+
+
+    isGameOver() {
+        // 現在は連続王手の千日手・持将棋は判定しない
+        const moves = this.generateLegalMoves();
+        return moves.length === 0;
+    }
+
+
     // ------------------------
     // USI表記変換
     // ------------------------
